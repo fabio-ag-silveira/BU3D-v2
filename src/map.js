@@ -6,6 +6,8 @@ const CELL_COUNT = sizeX * sizeY * sizeZ;
 
 // Materiais que nao sao predios (predios usam ids 1..200).
 export const MATERIALS = {
+  wood: 248,
+  leaves: 249,
   earth: 250,
   rock: 251,
   grass: 252,
@@ -25,10 +27,11 @@ const LANES_X_DYNAMIC = [-135, -105, -75, -45, -15, 15];
 const LANES_Z = [0, 30, 60, 90, 120, 152];
 const LANES_X_CLASSIC = [-90, -45, -15, 15];
 
+// Mais lotes vazios (viram pracas): a cidade cheia demais escondia o adversario.
 const DENSITIES = [
-  { id: "sparse", label: "espaçada", empty: 0.34, weight: 1 },
-  { id: "normal", label: "normal", empty: 0.2, weight: 2 },
-  { id: "dense", label: "densa", empty: 0.08, weight: 1 },
+  { id: "sparse", label: "espaçada", empty: 0.4, weight: 1 },
+  { id: "normal", label: "normal", empty: 0.3, weight: 2 },
+  { id: "dense", label: "densa", empty: 0.18, weight: 1 },
 ];
 
 export function cellIndex(ix, iy, iz) {
@@ -96,6 +99,8 @@ function createLayout(kind, seed) {
     islands: [],
     parks: [],
     bridges: [],
+    parkAreas: [],
+    style: "city",
     anchors: [],
     spawns: [],
     lanesX: kind === "classic" ? LANES_X_CLASSIC : LANES_X_DYNAMIC,
@@ -278,6 +283,73 @@ function addIsland(layout, rng) {
   return null;
 }
 
+// Arvore de voxel: tronco de 2-3 camadas e copa 3x3 (destrutivel; a copa cai se o tronco for cortado).
+function addTree(layout, rng, x, z) {
+  const ix = toCellX(x);
+  const iz = toCellZ(z);
+  let base = 0;
+  while (base < sizeY - 6 && layout.cells[cellIndex(ix, base, iz)]) {
+    base += 1;
+  }
+  const trunk = 2 + Math.floor(rng() * 2);
+  for (let iy = base; iy < base + trunk; iy += 1) {
+    layout.cells[cellIndex(ix, iy, iz)] = MATERIALS.wood;
+  }
+  const crownBase = base + trunk;
+  for (let iy = crownBase; iy < crownBase + 2; iy += 1) {
+    for (let dz = -1; dz <= 1; dz += 1) {
+      for (let dx = -1; dx <= 1; dx += 1) {
+        const corner = Math.abs(dx) + Math.abs(dz) === 2;
+        if (corner && (iy === crownBase + 1 || rng() < 0.5)) {
+          continue;
+        }
+        if (inside(ix + dx, iy, iz + dz) && !layout.cells[cellIndex(ix + dx, iy, iz + dz)]) {
+          layout.cells[cellIndex(ix + dx, iy, iz + dz)] = MATERIALS.leaves;
+        }
+      }
+    }
+  }
+}
+
+// Fase "Parque": um bloco de 2x2 quarteiroes perto do centro vira gramado aberto,
+// com morrinhos e arvores baixas; os predios ficam em volta.
+function planPark(rng) {
+  const column = 1 + Math.floor(rng() * 3);
+  const row = 1 + Math.floor(rng() * 2);
+  return { columns: [column, column + 1], rows: [row, row + 1] };
+}
+
+function fillPark(layout, rng, park) {
+  const minX = COLUMNS[park.columns[0]] - 11;
+  const maxX = COLUMNS[park.columns[1]] + 11;
+  const minZ = ROWS[park.rows[0]] - 11;
+  const maxZ = ROWS[park.rows[1]] + 11;
+  layout.parkAreas.push({ x: (minX + maxX) / 2, z: (minZ + maxZ) / 2, w: maxX - minX + 6, d: maxZ - minZ + 6 });
+  const mounds = 2 + Math.floor(rng() * 2);
+  for (let index = 0; index < mounds; index += 1) {
+    addMound(layout, rng, minX + 8 + rng() * (maxX - minX - 16), minZ + 8 + rng() * (maxZ - minZ - 16));
+  }
+  const trees = 7 + Math.floor(rng() * 5);
+  const placed = [];
+  for (let attempt = 0; attempt < 60 && placed.length < trees; attempt += 1) {
+    const x = minX + 3 + rng() * (maxX - minX - 6);
+    const z = minZ + 3 + rng() * (maxZ - minZ - 6);
+    if (placed.some((tree) => Math.hypot(tree.x - x, tree.z - z) < 9)) {
+      continue;
+    }
+    placed.push({ x, z });
+    addTree(layout, rng, x, z);
+  }
+  // Pontos de nascimento no gramado aberto (longe das arvores).
+  for (let attempt = 0; attempt < 30; attempt += 1) {
+    const x = minX + 8 + rng() * (maxX - minX - 16);
+    const z = minZ + 8 + rng() * (maxZ - minZ - 16);
+    if (placed.every((tree) => Math.hypot(tree.x - x, tree.z - z) > 9)) {
+      layout.spawns.push({ x, y: 0, z, kind: "park" });
+    }
+  }
+}
+
 // Cidade nova a cada rodada: mesma malha de ruas, prédios e terrenos sorteados.
 function generateDynamic(seed) {
   const rng = createRng(seed);
@@ -285,19 +357,25 @@ function generateDynamic(seed) {
   let roll = rng() * DENSITIES.reduce((sum, entry) => sum + entry.weight, 0);
   const density = DENSITIES.find((entry) => (roll -= entry.weight) <= 0) ?? DENSITIES[1];
   layout.density = density.label;
+  const park = rng() < 0.25 ? planPark(rng) : null;
+  layout.style = park ? "park" : "city";
 
   const empties = [];
   const lattice = COLUMNS.map(() => ROWS.map(() => null));
   COLUMNS.forEach((x, column) => {
     ROWS.forEach((z, row) => {
+      if (park && park.columns.includes(column) && park.rows.includes(row)) {
+        return;
+      }
       if (rng() < density.empty) {
         empties.push({ x, z });
         return;
       }
+      // Torres altas sao raras (8%) e um pouco mais baixas: sao elas que mais tapam a visao.
       const sizeRoll = rng();
-      const layers = sizeRoll < 0.45 ? 8 + Math.floor(rng() * 4)
-        : sizeRoll < 0.8 ? 12 + Math.floor(rng() * 5)
-          : 18 + Math.floor(rng() * 6);
+      const layers = sizeRoll < 0.55 ? 8 + Math.floor(rng() * 4)
+        : sizeRoll < 0.92 ? 12 + Math.floor(rng() * 5)
+          : 17 + Math.floor(rng() * 4);
       const building = addBuilding(layout, {
         x: x + (rng() < 0.5 ? 0 : (rng() < 0.5 ? -2 : 2)),
         z: z + (rng() < 0.5 ? 0 : (rng() < 0.5 ? -2 : 2)),
@@ -321,6 +399,9 @@ function generateDynamic(seed) {
     }
   });
 
+  if (park) {
+    fillPark(layout, rng, park);
+  }
   addBridges(layout, rng, lattice);
 
   const islandCount = 2 + Math.floor(rng() * 3);

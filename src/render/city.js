@@ -4,6 +4,8 @@ import { cellCenter } from "../world.js";
 import { MATERIALS } from "../map.js";
 
 const MATERIAL_COLORS = {
+  [MATERIALS.wood]: "#6b4b32",
+  [MATERIALS.leaves]: "#4f8a3a",
   [MATERIALS.earth]: "#7a5a3c",
   [MATERIALS.rock]: "#6f6a62",
   [MATERIALS.grass]: "#5d8f3b",
@@ -219,6 +221,17 @@ export class Ground {
     sidewalks.count = layout.buildings.length;
     sidewalks.receiveShadow = true;
     this.layoutGroup.add(sidewalks);
+
+    // Gramado retangular da fase Parque (cobre as faixas da rua que passariam por ali).
+    if (layout.parkAreas?.length) {
+      const lawns = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), this.parkMaterial, layout.parkAreas.length);
+      layout.parkAreas.forEach((area, index) => {
+        matrix.compose(new THREE.Vector3(area.x, 0.07, area.z), new THREE.Quaternion(), new THREE.Vector3(area.w, 1, area.d));
+        lawns.setMatrixAt(index, matrix);
+      });
+      lawns.receiveShadow = true;
+      this.layoutGroup.add(lawns);
+    }
 
     if (layout.parks.length) {
       const parks = new THREE.InstancedMesh(new THREE.CircleGeometry(1, 28).rotateX(-Math.PI / 2), this.parkMaterial, layout.parks.length);

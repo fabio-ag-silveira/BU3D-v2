@@ -62,7 +62,10 @@ function createInputState() {
   return Object.fromEntries(CONTROLS.map((control) => [control, false]));
 }
 
-const SPAWN_WEIGHTS = { island: 0.35, roof: 0.4, street: 0.25, bridge: 0.2 };
+// Pontos altos sao a regra; nascer na rua (um "canion" entre predios) fica raro.
+const SPAWN_WEIGHTS = { island: 0.35, roof: 0.45, bridge: 0.2, park: 0.1, street: 0.06 };
+// Chance de exigir que o adversario comece a vista (o resto continua podendo comecar escondido).
+const SIGHT_PREFERENCE = 0.4;
 
 function weightedSpawn(candidates) {
   const kinds = [...new Set(candidates.map((spawn) => spawn.kind))];
@@ -71,9 +74,24 @@ function weightedSpawn(candidates) {
   return randomItem(candidates.filter((spawn) => spawn.kind === kind));
 }
 
-// Escolhe pontos afastados entre si: o primeiro sorteado, os outros maximizando a menor distancia.
-function spreadSpawns(candidates, count, first) {
+// Linha reta do canhao de um ate o centro do outro, sem voxel no meio.
+export function hasLineOfSight(world, a, b) {
+  const from = { x: a.x, y: a.y + 4.6, z: a.z };
+  const to = { x: b.x, y: b.y + 2.5, z: b.z };
+  const steps = Math.ceil(Math.hypot(to.x - from.x, to.y - from.y, to.z - from.z));
+  for (let index = 3; index < steps - 3; index += 1) {
+    const t = index / steps;
+    if (world.isBuildingSolid({ x: from.x + (to.x - from.x) * t, y: from.y + (to.y - from.y) * t, z: from.z + (to.z - from.z) * t })) {
+      return false;
+    }
+  }
+  return true;
+}
+
+// Escolhe pontos afastados entre si; na maioria das rodadas, com o adversario a vista.
+function spreadSpawns(candidates, count, first, world) {
   const chosen = [first];
+  const wantSight = world && Math.random() < SIGHT_PREFERENCE;
   while (chosen.length < count) {
     const scored = candidates
       .filter((spawn) => !chosen.includes(spawn))
@@ -83,11 +101,15 @@ function spreadSpawns(candidates, count, first) {
       chosen.push(first);
       continue;
     }
-    // Sorteia entre os mais afastados para variar sem juntar ninguem.
-    const best = scored[0].distance;
-    const pool = scored.filter((entry) => entry.distance >= Math.min(best, Math.max(best * 0.75, 45)));
-    const varied = pool.filter((entry) => !chosen.some((other) => other.kind === entry.spawn.kind));
-    chosen.push(weightedSpawn((varied.length && Math.random() < 0.6 ? varied : pool).map((entry) => entry.spawn)));
+    const far = scored.filter((entry) => entry.distance >= MIN_SPAWN_DISTANCE);
+    let pool = far.length ? far : scored.slice(0, 5);
+    if (wantSight) {
+      const inSight = pool.filter((entry) => chosen.some((other) => hasLineOfSight(world, other, entry.spawn)));
+      if (inSight.length) {
+        pool = inSight;
+      }
+    }
+    chosen.push(weightedSpawn(pool.map((entry) => entry.spawn)));
   }
   return chosen;
 }
@@ -105,7 +127,7 @@ function pickSpawns(layout, world, count) {
   }
   const valid = layout.spawns.filter((spawn) =>
     [0, 90].some((yaw) => isTankSpaceFree(world, spawn, yaw)) && isTankSupported(world, spawn, 0));
-  return spreadSpawns(valid, count, weightedSpawn(valid));
+  return spreadSpawns(valid, count, weightedSpawn(valid), world);
 }
 
 function pickModifier(round) {
