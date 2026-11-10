@@ -175,19 +175,25 @@
         </div>
       </div>
 
+      <!-- Controles de toque flutuantes por cima do jogo: direcional a esquerda, mira e tiro a direita. -->
       <div class="touch-controls" id="touchControls">
-        <div class="touch-group">
-          <button type="button" class="touch-button" data-control="left" aria-label="Girar para a esquerda"><svg class="touch-icon is-left" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.2-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg></button>
-          <button type="button" class="touch-button" data-control="right" aria-label="Girar para a direita"><svg class="touch-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.2-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg></button>
-          <button type="button" class="touch-button touch-text touch-target" data-control="target" aria-label="Mirar no inimigo">ALVO</button>
-          <button type="button" class="touch-button touch-text" data-control="back" aria-label="Andar de ré">RÉ</button>
-          <button type="button" class="touch-button touch-text" data-control="forward" aria-label="Andar para frente">FRENTE</button>
+        <div class="touch-pad">
+          <button type="button" class="touch-button pad-up" data-control="forward" aria-label="Andar para frente"><svg class="touch-icon is-up" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.2-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg></button>
+          <button type="button" class="touch-button pad-left" data-control="left" aria-label="Girar para a esquerda"><svg class="touch-icon is-left" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.2-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg></button>
+          <button type="button" class="touch-button pad-right" data-control="right" aria-label="Girar para a direita"><svg class="touch-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.2-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg></button>
+          <button type="button" class="touch-button pad-down" data-control="back" aria-label="Andar de ré"><svg class="touch-icon is-down" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.2-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg></button>
         </div>
-        <div class="touch-group">
-          <button type="button" class="touch-button touch-text touch-camera" id="touchCamera" aria-label="Trocar câmera">CÂM</button>
-          <button type="button" class="touch-button touch-text touch-weapon" data-control="weapon" aria-label="Trocar de arma">ARMA</button>
-          <button type="button" class="touch-button" data-control="up" aria-label="Levantar o canhão"><svg class="touch-icon is-up" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.2-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg></button>
-          <button type="button" class="touch-button" data-control="down" aria-label="Abaixar o canhão"><svg class="touch-icon is-down" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.2-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg></button>
+        <div class="touch-actions">
+          <div class="touch-tools">
+            <button type="button" class="touch-button touch-text touch-target" data-control="target" aria-label="Mirar no inimigo">ALVO</button>
+            <button type="button" class="touch-button touch-text touch-weapon" data-control="weapon" aria-label="Trocar de arma">ARMA</button>
+            <button type="button" class="touch-button touch-text touch-camera" id="touchCamera" aria-label="Trocar câmera">CÂM</button>
+          </div>
+          <div class="touch-aim">
+            <button type="button" class="touch-button" data-control="up" aria-label="Levantar o canhão"><svg class="touch-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg></button>
+            <span class="touch-aim-label" aria-hidden="true">MIRA</span>
+            <button type="button" class="touch-button" data-control="down" aria-label="Abaixar o canhão"><svg class="touch-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+          </div>
           <button type="button" class="touch-button touch-fire" data-control="fire" aria-label="Atirar: segure para carregar e solte">
             ATIRAR<small>segure e solte</small>
           </button>

@@ -559,11 +559,6 @@ body.touch .touch-controls {
   display: flex;
 }
 
-.touch-group {
-  display: flex;
-  gap: 10px;
-}
-
 .touch-button {
   width: 64px;
   height: 56px;
@@ -763,30 +758,6 @@ body.touch .touch-controls {
   body.menu-open .hud-backdrop {
     opacity: 1;
     pointer-events: auto;
-  }
-}
-
-@media (max-width: 560px) {
-  .touch-controls {
-    flex-wrap: wrap;
-    gap: 8px;
-    padding-top: 8px;
-  }
-
-  .touch-group {
-    flex: 1 1 100%;
-    gap: 8px;
-  }
-
-  .touch-group .touch-button {
-    flex: 1 1 0;
-    width: auto;
-    min-width: 0;
-    height: 50px;
-  }
-
-  .touch-group .touch-fire {
-    flex: 1.7 1 0;
   }
 }
 
@@ -1404,10 +1375,6 @@ body.minimap-off .minimap {
     padding-top: 6px;
   }
 
-  .touch-group {
-    gap: 8px;
-  }
-
   .touch-button {
     width: 56px;
     height: 48px;
@@ -1592,13 +1559,6 @@ body.minimap-off .minimap {
     width: 62%;
   }
 
-  .touch-controls {
-    padding-top: 8px;
-  }
-
-  .touch-group .touch-button {
-    height: 46px;
-  }
 }
 
 /* Arma selecionada, acima da barra de forca. */
@@ -1998,4 +1958,227 @@ body.minimap-off .minimap {
 
 .target-label.is-self {
   background: color-mix(in srgb, var(--team) 35%, rgba(10, 12, 18, 0.7));
+}
+
+/* ---------- Controles de toque flutuantes ----------
+   Ficam por cima do jogo, translúcidos, como nos jogos de celular: direcional no canto
+   esquerdo (frente, ré e girar) e, no direito, atalhos, mira do canhão e o botão de tiro. */
+.touch-controls {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 6;
+  align-items: flex-end;
+  padding: 0 max(14px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left));
+  flex-wrap: nowrap;
+  background: none;
+  border: 0;
+  pointer-events: none;
+}
+
+.touch-controls .touch-button {
+  --size: 58px;
+  width: var(--size);
+  height: var(--size);
+  padding: 0;
+  border: 1.5px solid rgba(255, 255, 255, 0.34);
+  border-radius: 50%;
+  background: rgba(12, 14, 20, 0.3);
+  color: rgba(255, 255, 255, 0.92);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.22);
+  -webkit-backdrop-filter: blur(3px);
+  backdrop-filter: blur(3px);
+  pointer-events: auto;
+}
+
+.touch-controls .touch-button.is-pressed {
+  background: rgba(255, 255, 255, 0.75);
+  color: #10131a;
+  text-shadow: none;
+}
+
+.touch-controls .touch-icon {
+  width: 24px;
+  height: 24px;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.6));
+}
+
+/* Direcional em cruz. */
+.touch-pad {
+  display: grid;
+  grid-template-columns: repeat(3, auto);
+  grid-template-areas: ". up ." "left . right" ". down .";
+  gap: 2px;
+}
+
+.pad-up { grid-area: up; }
+.pad-left { grid-area: left; }
+.pad-right { grid-area: right; }
+.pad-down { grid-area: down; }
+
+/* Lado direito: atalhos em cima; mira e tiro embaixo. */
+.touch-actions {
+  display: grid;
+  grid-template-areas: "tools tools" "aim fire";
+  align-items: end;
+  justify-items: end;
+  gap: 10px 12px;
+}
+
+.touch-tools {
+  grid-area: tools;
+  display: flex;
+  gap: 6px;
+}
+
+.touch-controls .touch-tools .touch-button {
+  width: 60px;
+  height: 34px;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+}
+
+.touch-controls .touch-target { color: #f9a8d4; }
+.touch-controls .touch-weapon { color: #ffd166; }
+.touch-controls .touch-camera { color: #7dd3fc; }
+
+/* Mira do canhão: uma cápsula vertical com subir e descer. */
+.touch-aim {
+  grid-area: aim;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 2px;
+  border: 1.5px solid rgba(255, 255, 255, 0.34);
+  border-radius: 999px;
+  background: rgba(12, 14, 20, 0.3);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.22);
+  -webkit-backdrop-filter: blur(3px);
+  backdrop-filter: blur(3px);
+}
+
+.touch-controls .touch-aim .touch-button {
+  width: 48px;
+  height: 42px;
+  border: 0;
+  background: none;
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.touch-controls .touch-aim .touch-button.is-pressed {
+  background: rgba(255, 255, 255, 0.75);
+}
+
+.touch-chevron {
+  width: 24px;
+  height: 24px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.6));
+  pointer-events: none;
+}
+
+.touch-aim-label {
+  font-size: 0.52rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  color: rgba(255, 255, 255, 0.7);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
+}
+
+.touch-controls .touch-fire {
+  grid-area: fire;
+  --size: 92px;
+  border: 2px solid rgba(254, 202, 202, 0.7);
+  background: radial-gradient(circle at 50% 35%, rgba(248, 113, 113, 0.62), rgba(185, 28, 28, 0.5));
+  font-size: 0.92rem;
+  letter-spacing: 0.06em;
+}
+
+.touch-controls .touch-fire.is-pressed {
+  background: radial-gradient(circle at 50% 35%, rgba(254, 202, 202, 0.85), rgba(239, 68, 68, 0.75));
+  color: #fff;
+}
+
+.touch-controls .touch-fire small {
+  font-size: 0.5rem;
+}
+
+/* Celular deitado: pouca altura, tudo um pouco menor. */
+@media (max-height: 500px) {
+  .touch-controls {
+    padding-bottom: max(8px, env(safe-area-inset-bottom));
+  }
+
+  .touch-controls .touch-button {
+    --size: 50px;
+  }
+
+  .touch-controls .touch-icon {
+    width: 20px;
+    height: 20px;
+  }
+
+  .touch-actions {
+    gap: 8px 10px;
+  }
+
+  .touch-controls .touch-tools .touch-button {
+    width: 52px;
+    height: 30px;
+    font-size: 0.62rem;
+  }
+
+  .touch-controls .touch-aim .touch-button {
+    width: 44px;
+    height: 36px;
+  }
+
+  .touch-controls .touch-fire {
+    --size: 80px;
+    font-size: 0.82rem;
+  }
+}
+
+/* Celular em pé: a barra de mira sobe para não ficar entre os controles. */
+@media (max-width: 560px) and (pointer: coarse) {
+  .power-panel {
+    bottom: 186px;
+    width: min(320px, 82%);
+  }
+
+  .aim-feedback {
+    bottom: 222px;
+  }
+}
+
+@media (max-width: 560px) {
+  body.touch .power-panel {
+    bottom: 186px;
+    width: min(320px, 82%);
+  }
+
+  body.touch .aim-feedback {
+    bottom: 222px;
+  }
+
+  .touch-controls .touch-button {
+    --size: 48px;
+  }
+
+  .touch-controls .touch-tools .touch-button {
+    width: 50px;
+  }
+
+  .touch-controls .touch-fire {
+    --size: 78px;
+  }
 }
