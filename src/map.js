@@ -6,6 +6,7 @@ const CELL_COUNT = sizeX * sizeY * sizeZ;
 
 // Materiais que nao sao predios (predios usam ids 1..200).
 export const MATERIALS = {
+  tile: 247,
   wood: 248,
   leaves: 249,
   earth: 250,
@@ -54,10 +55,11 @@ function typeForLayers(layers) {
   return layers < 12 ? "small" : layers < 17 ? "medium" : "tall";
 }
 
-function addBuilding(layout, { x, z, halfX, halfZ, layers, type }) {
+function addBuilding(layout, { x, z, halfX, halfZ, layers, type, house = false }) {
   const id = layout.buildings.length + 1;
   const building = {
     id,
+    house,
     type: type ?? typeForLayers(layers),
     x,
     z,
@@ -97,7 +99,7 @@ function createLayout(kind, seed) {
     cells: new Uint8Array(CELL_COUNT),
     buildings: [],
     islands: [],
-    parks: [],
+    lots: [],
     bridges: [],
     parkAreas: [],
     style: "city",
@@ -124,31 +126,6 @@ function generateClassic() {
   });
   layout.playerSpawns = PLAYER_DEFAULTS.map((template) => template.spawns.map((spawn) => ({ ...spawn, kind: "classic" })));
   return layout;
-}
-
-function addMound(layout, rng, x, z) {
-  const radius = 8 + rng() * 4;
-  const peak = 1 + Math.floor(rng() * 3);
-  const cx = x + (rng() * 2 - 1) * 3;
-  const cz = z + (rng() * 2 - 1) * 3;
-  const reach = Math.ceil(radius / VOXEL_SIZE) + 1;
-  for (let iz = toCellZ(cz) - reach; iz <= toCellZ(cz) + reach; iz += 1) {
-    for (let ix = toCellX(cx) - reach; ix <= toCellX(cx) + reach; ix += 1) {
-      const px = originX + (ix + 0.5) * VOXEL_SIZE;
-      const pz = originZ + (iz + 0.5) * VOXEL_SIZE;
-      const distance = Math.hypot(px - cx, pz - cz) / radius;
-      if (distance > 1) {
-        continue;
-      }
-      const height = Math.ceil(peak * (1 - distance * distance) - 0.15);
-      for (let iy = 0; iy < height; iy += 1) {
-        if (inside(ix, iy, iz) && !layout.cells[cellIndex(ix, iy, iz)]) {
-          layout.cells[cellIndex(ix, iy, iz)] = iy === height - 1 ? MATERIALS.grass : MATERIALS.earth;
-        }
-      }
-    }
-  }
-  layout.parks.push({ x, z, radius: radius + 3, peak });
 }
 
 // Passarela entre dois predios vizinhos de altura parecida, rente ao telhado mais baixo.
@@ -224,7 +201,7 @@ function addIsland(layout, rng) {
     if (!far) {
       continue;
     }
-    // Precisa de folga sobre o que estiver embaixo (predios, morros).
+    // Precisa de folga sobre o que estiver embaixo (predios, casas, arvores).
     let clear = true;
     for (let iz = cz - radius; iz <= cz + radius && clear; iz += 1) {
       for (let ix = cx - radius; ix <= cx + radius && clear; ix += 1) {
@@ -311,24 +288,59 @@ function addTree(layout, rng, x, z) {
   }
 }
 
+// Casinha de voxel: paredes de 2 ou 3 andares e telhado de duas aguas em degraus (telha).
+// Tudo destrutivel; o telhado desaba se as paredes forem derrubadas.
+function addHouse(layout, rng, x, z) {
+  const layers = rng() < 0.75 ? 2 : 3;
+  const house = addBuilding(layout, { x, z, halfX: 2, halfZ: 2, layers, type: "small", house: true });
+  const ridgeOnX = rng() < 0.5;
+  const [acrossMin, acrossMax] = ridgeOnX ? [house.minIz, house.maxIz] : [house.minIx, house.maxIx];
+  for (let step = 0; acrossMin + step <= acrossMax - step; step += 1) {
+    const iy = layers + step;
+    for (let iz = house.minIz; iz <= house.maxIz; iz += 1) {
+      for (let ix = house.minIx; ix <= house.maxIx; ix += 1) {
+        const across = ridgeOnX ? iz : ix;
+        if (across >= acrossMin + step && across <= acrossMax - step && inside(ix, iy, iz)) {
+          layout.cells[cellIndex(ix, iy, iz)] = MATERIALS.tile;
+        }
+      }
+    }
+  }
+}
+
+// Terreno vazio de quarteirao: gramado com casinhas e arvores (ou so arvores, uma pracinha).
+// O terreno e dividido em quatro cantos; cada canto recebe uma casa ou uma arvore.
+function fillLot(layout, rng, slot) {
+  layout.lots.push({ x: slot.x, z: slot.z });
+  const corners = [[-5, -5], [5, -5], [-5, 5], [5, 5]].sort(() => rng() - 0.5);
+  const houses = rng() < 0.6 ? 2 + Math.floor(rng() * 2) : 0;
+  corners.forEach(([dx, dz], index) => {
+    if (index < houses) {
+      addHouse(layout, rng, slot.x + dx, slot.z + dz);
+    } else if (houses === 0 || rng() < 0.7) {
+      addTree(layout, rng, slot.x + dx + (rng() * 2 - 1) * 1.5, slot.z + dz + (rng() * 2 - 1) * 1.5);
+    }
+  });
+}
+
 // Fase "Parque": um bloco de 2x2 quarteiroes perto do centro vira gramado aberto,
-// com morrinhos e arvores baixas; os predios ficam em volta.
+// com arvores baixas; os predios ficam em volta.
 function planPark(rng) {
   const column = 1 + Math.floor(rng() * 3);
   const row = 1 + Math.floor(rng() * 2);
   return { columns: [column, column + 1], rows: [row, row + 1] };
 }
 
-function fillPark(layout, rng, park) {
+function fillPark(layout, rng, park, extraRng) {
   const minX = COLUMNS[park.columns[0]] - 11;
   const maxX = COLUMNS[park.columns[1]] + 11;
   const minZ = ROWS[park.rows[0]] - 11;
   const maxZ = ROWS[park.rows[1]] + 11;
   layout.parkAreas.push({ x: (minX + maxX) / 2, z: (minZ + maxZ) / 2, w: maxX - minX + 6, d: maxZ - minZ + 6 });
-  const mounds = 2 + Math.floor(rng() * 2);
-  for (let index = 0; index < mounds; index += 1) {
-    addMound(layout, rng, minX + 8 + rng() * (maxX - minX - 16), minZ + 8 + rng() * (maxZ - minZ - 16));
-  }
+  // Os morrinhos de grama sairam; os sorteios deles continuam sendo consumidos para que
+  // cada seed gere a mesma cidade de antes. No lugar entram mais arvores.
+  const oldMounds = 2 + Math.floor(rng() * 2);
+  skipDraws(rng, oldMounds * 6);
   const trees = 7 + Math.floor(rng() * 5);
   const placed = [];
   for (let attempt = 0; attempt < 60 && placed.length < trees; attempt += 1) {
@@ -348,11 +360,32 @@ function fillPark(layout, rng, park) {
       layout.spawns.push({ x, y: 0, z, kind: "park" });
     }
   }
+  // Arvores extras no lugar dos morrinhos, longe das outras e dos pontos de nascimento.
+  const parkSpawns = layout.spawns.filter((spawn) => spawn.kind === "park");
+  const extra = 3 + Math.floor(extraRng() * 3);
+  for (let attempt = 0, added = 0; attempt < 60 && added < extra; attempt += 1) {
+    const x = minX + 3 + extraRng() * (maxX - minX - 6);
+    const z = minZ + 3 + extraRng() * (maxZ - minZ - 6);
+    if (placed.some((tree) => Math.hypot(tree.x - x, tree.z - z) < 9) || parkSpawns.some((spawn) => Math.hypot(spawn.x - x, spawn.z - z) < 7)) {
+      continue;
+    }
+    placed.push({ x, z });
+    addTree(layout, extraRng, x, z);
+    added += 1;
+  }
+}
+
+function skipDraws(rng, count) {
+  for (let index = 0; index < count; index += 1) {
+    rng();
+  }
 }
 
 // Cidade nova a cada rodada: mesma malha de ruas, prédios e terrenos sorteados.
 function generateDynamic(seed) {
   const rng = createRng(seed);
+  // Sorteios das casas e arvores dos terrenos: fluxo proprio, para nao mudar o resto do mapa.
+  const lotRng = createRng((seed ^ 0x5bd1e995) >>> 0);
   const layout = createLayout("dynamic", seed);
   let roll = rng() * DENSITIES.reduce((sum, entry) => sum + entry.weight, 0);
   const density = DENSITIES.find((entry) => (roll -= entry.weight) <= 0) ?? DENSITIES[1];
@@ -392,15 +425,17 @@ function generateDynamic(seed) {
     });
   });
 
-  // Terrenos vazios viram pracas com morros (relevo).
+  // Terrenos vazios viram gramados com casinhas e arvores (antes eram morros de grama).
+  // Consome os mesmos sorteios dos antigos morros para manter predios, ilhas e passarelas.
   empties.forEach((slot) => {
     if (rng() < 0.75) {
-      addMound(layout, rng, slot.x, slot.z);
+      skipDraws(rng, 4);
+      fillLot(layout, lotRng, slot);
     }
   });
 
   if (park) {
-    fillPark(layout, rng, park);
+    fillPark(layout, rng, park, lotRng);
   }
   addBridges(layout, rng, lattice);
 

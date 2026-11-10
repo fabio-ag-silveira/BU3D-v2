@@ -95,6 +95,20 @@ function windowTextures() {
   };
 }
 
+// Caixa de predio com janelas so nas fachadas: o topo e a base apontam para um canto liso
+// da textura (sem janela), para o telhado nao ficar com janelas.
+function facadeBoxGeometry() {
+  const geometry = new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0);
+  const uv = geometry.getAttribute("uv");
+  const plain = [2 / 64, 62 / 64];
+  // Ordem das faces do BoxGeometry: +x, -x, +y, -y, +z, -z (4 vertices cada).
+  for (let vertex = 8; vertex < 16; vertex += 1) {
+    uv.setXY(vertex, plain[0], plain[1]);
+  }
+  uv.needsUpdate = true;
+  return geometry;
+}
+
 // Telhado de duas aguas: base 1x1 em y=0 e cumeeira em y=1 ao longo de x.
 function gableGeometry() {
   const a = [-0.5, 0, -0.5];
@@ -253,7 +267,7 @@ export class Surroundings {
     this.parkMaterial = new THREE.MeshStandardMaterial({ roughness: 1 });
     const houses = new InstanceBatch(new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0), this.houseMaterial, 1400);
     const roofs = new InstanceBatch(gableGeometry(), this.roofMaterial, 1400);
-    const towers = new InstanceBatch(new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0), this.towerMaterial, 160);
+    const towers = new InstanceBatch(facadeBoxGeometry(), this.towerMaterial, 160);
     const trunks = new InstanceBatch(new THREE.CylinderGeometry(0.35, 0.45, 1, 6).translate(0, 0.5, 0), this.trunkMaterial, 1600);
     const crowns = new InstanceBatch(new THREE.IcosahedronGeometry(1, 0), this.crownMaterial, 1600);
     const parks = new InstanceBatch(new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), this.parkMaterial, 300);
@@ -352,7 +366,7 @@ export class Surroundings {
 
     // Skyline da outra margem da baia.
     this.farTowerMaterial = this.towerMaterial.clone();
-    const farTowers = new InstanceBatch(new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0), this.farTowerMaterial, 90);
+    const farTowers = new InstanceBatch(facadeBoxGeometry(), this.farTowerMaterial, 90);
     for (let x = -650; x <= 560; x += 13 + rng() * 14) {
       const width = 10 + rng() * 16;
       farTowers.add(v(x, 1.5, 590 + rng() * 60), v(width, 18 + rng() * (Math.abs(x - ARENA_CENTER.x) < 260 ? 110 : 60), width * (0.7 + rng() * 0.6)), "#ffffff");

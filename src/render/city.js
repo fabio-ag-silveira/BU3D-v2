@@ -4,6 +4,7 @@ import { cellCenter } from "../world.js";
 import { MATERIALS } from "../map.js";
 
 const MATERIAL_COLORS = {
+  [MATERIALS.tile]: "#a5523a",
   [MATERIALS.wood]: "#6b4b32",
   [MATERIALS.leaves]: "#4f8a3a",
   [MATERIALS.earth]: "#7a5a3c",
@@ -108,7 +109,8 @@ export class CityMesh {
             const onZ = iz === building.minIz || iz === building.maxIz;
             const slot = onX && !onZ ? iz - building.minIz : onZ && !onX ? ix - building.minIx : -1;
             const span = onX ? building.maxIz - building.minIz : building.maxIx - building.minIx;
-            const isRoof = iy === building.layers - 1;
+            // Casinhas tem telhado de telha por cima: a ultima camada de parede nao e laje.
+            const isRoof = !building.house && iy === building.layers - 1;
             const isWindow = slot > 0 && slot < span && !isRoof && iy > 0 && iy % 2 === 1 && slot % 3 !== 0;
             const isDoor = slot >= 0 && iy === 0 && Math.abs(slot - span / 2) < 1;
 
@@ -209,18 +211,33 @@ export class Ground {
     this.layoutGroup.clear();
     const matrix = new THREE.Matrix4();
 
-    const sidewalks = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 0.3, 1), this.sidewalkMaterial, Math.max(1, layout.buildings.length));
-    layout.buildings.forEach((building, index) => {
-      const width = (building.maxIx - building.minIx + 1) * VOXEL_SIZE + 4;
-      const depth = (building.maxIz - building.minIz + 1) * VOXEL_SIZE + 4;
-      const x = GRID.originX + ((building.minIx + building.maxIx + 1) / 2) * VOXEL_SIZE;
-      const z = GRID.originZ + ((building.minIz + building.maxIz + 1) / 2) * VOXEL_SIZE;
-      matrix.compose(new THREE.Vector3(x, 0.15, z), new THREE.Quaternion(), new THREE.Vector3(width, 1, depth));
+    // Calcada em volta de cada predio; os terrenos com casinhas ganham uma calcada do tamanho
+    // do lote (as casas ficam no gramado, sem calcada propria).
+    const lots = layout.lots ?? [];
+    const blocks = layout.buildings.filter((building) => !building.house).map((building) => ({
+      x: GRID.originX + ((building.minIx + building.maxIx + 1) / 2) * VOXEL_SIZE,
+      z: GRID.originZ + ((building.minIz + building.maxIz + 1) / 2) * VOXEL_SIZE,
+      w: (building.maxIx - building.minIx + 1) * VOXEL_SIZE + 4,
+      d: (building.maxIz - building.minIz + 1) * VOXEL_SIZE + 4,
+    })).concat(lots.map((lot) => ({ x: lot.x, z: lot.z, w: 23, d: 23 })));
+    const sidewalks = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 0.3, 1), this.sidewalkMaterial, Math.max(1, blocks.length));
+    blocks.forEach((block, index) => {
+      matrix.compose(new THREE.Vector3(block.x, 0.15, block.z), new THREE.Quaternion(), new THREE.Vector3(block.w, 1, block.d));
       sidewalks.setMatrixAt(index, matrix);
     });
-    sidewalks.count = layout.buildings.length;
+    sidewalks.count = blocks.length;
     sidewalks.receiveShadow = true;
     this.layoutGroup.add(sidewalks);
+
+    if (lots.length) {
+      const yards = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), this.parkMaterial, lots.length);
+      lots.forEach((lot, index) => {
+        matrix.compose(new THREE.Vector3(lot.x, 0.32, lot.z), new THREE.Quaternion(), new THREE.Vector3(20, 1, 20));
+        yards.setMatrixAt(index, matrix);
+      });
+      yards.receiveShadow = true;
+      this.layoutGroup.add(yards);
+    }
 
     // Gramado retangular da fase Parque (cobre as faixas da rua que passariam por ali).
     if (layout.parkAreas?.length) {
@@ -231,16 +248,6 @@ export class Ground {
       });
       lawns.receiveShadow = true;
       this.layoutGroup.add(lawns);
-    }
-
-    if (layout.parks.length) {
-      const parks = new THREE.InstancedMesh(new THREE.CircleGeometry(1, 28).rotateX(-Math.PI / 2), this.parkMaterial, layout.parks.length);
-      layout.parks.forEach((park, index) => {
-        matrix.compose(new THREE.Vector3(park.x, 0.06, park.z), new THREE.Quaternion(), new THREE.Vector3(park.radius, 1, park.radius));
-        parks.setMatrixAt(index, matrix);
-      });
-      parks.receiveShadow = true;
-      this.layoutGroup.add(parks);
     }
 
     const dashes = [];
