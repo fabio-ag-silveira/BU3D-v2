@@ -1464,7 +1464,7 @@ body.minimap-off .minimap {
   }
 
   .minimap {
-    top: calc(max(6px, env(safe-area-inset-top)) + 48px);
+    top: calc(max(6px, env(safe-area-inset-top)) + 66px); /* abaixo do card do Player 2, com folga */
     width: 72px;
     height: 72px;
   }
